@@ -15,6 +15,7 @@ import { adminOnlyFieldAccess } from '@/access/adminOnlyFieldAccess'
 import { customerOnlyFieldAccess } from '@/access/customerOnlyFieldAccess'
 import { isAdmin } from '@/access/isAdmin'
 import { isDocumentOwner } from '@/access/isDocumentOwner'
+import { mobileOtpAuthPlugin, mobileOtpAuthPaths } from '@/plugins/mobileOtpAuth'
 import { openapi, swaggerUI } from 'payload-oapi'
 
 const generateTitle: GenerateTitle<Product | Page> = ({ doc }) => {
@@ -27,7 +28,39 @@ const generateURL: GenerateURL<Product | Page> = ({ doc }) => {
   return doc?.slug ? `${url}/${doc.slug}` : url
 }
 
+const openapiEnhancerPlugin = (): Plugin => (config) => {
+  const specEndpoint = config.endpoints?.find(
+    (e) => e.path === '/openapi.json' && e.method === 'get',
+  )
+
+  if (specEndpoint) {
+    const originalHandler = specEndpoint.handler
+    specEndpoint.handler = async (req) => {
+      const response = await originalHandler(req)
+      if (response instanceof Response) {
+        const spec = await response.json()
+        if (!spec.paths) {
+          spec.paths = {}
+        }
+
+        spec.paths = {
+          ...spec.paths,
+          ...mobileOtpAuthPaths,
+        }
+
+        return Response.json(spec)
+      }
+      return response
+    }
+  }
+
+  return config
+}
+
 export const plugins: Plugin[] = [
+  mobileOtpAuthPlugin({
+    usersSlug: 'users',
+  }),
   seoPlugin({
     generateTitle,
     generateURL,
@@ -138,8 +171,10 @@ export const plugins: Plugin[] = [
       description: 'API documentation',
     },
   }),
+  openapiEnhancerPlugin(),
   swaggerUI({
     docsUrl: '/docs',
     specEndpoint: '/openapi.json',
   }),
 ]
+

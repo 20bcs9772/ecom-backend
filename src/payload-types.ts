@@ -76,6 +76,8 @@ export interface Config {
     pages: Page;
     categories: Category;
     media: Media;
+    retailers: Retailer;
+    'delivery-partners': DeliveryPartner;
     forms: Form;
     'form-submissions': FormSubmission;
     addresses: Address;
@@ -109,6 +111,8 @@ export interface Config {
     pages: PagesSelect<false> | PagesSelect<true>;
     categories: CategoriesSelect<false> | CategoriesSelect<true>;
     media: MediaSelect<false> | MediaSelect<true>;
+    retailers: RetailersSelect<false> | RetailersSelect<true>;
+    'delivery-partners': DeliveryPartnersSelect<false> | DeliveryPartnersSelect<true>;
     forms: FormsSelect<false> | FormsSelect<true>;
     'form-submissions': FormSubmissionsSelect<false> | FormSubmissionsSelect<true>;
     addresses: AddressesSelect<false> | AddressesSelect<true>;
@@ -187,7 +191,7 @@ export interface UserAuthOperations {
 export interface User {
   id: number;
   name?: string | null;
-  roles?: ('admin' | 'customer')[] | null;
+  roles?: ('admin' | 'customer' | 'retailer' | 'delivery_partner')[] | null;
   orders?: {
     docs?: (number | Order)[];
     hasNextPage?: boolean;
@@ -203,6 +207,12 @@ export interface User {
     hasNextPage?: boolean;
     totalDocs?: number;
   };
+  /**
+   * Primary mobile number for OTP login. Store in E.164 format.
+   */
+  mobileNumber?: string | null;
+  mobileVerified?: boolean | null;
+  lastOtpLoginAt?: string | null;
   updatedAt: string;
   createdAt: string;
   email: string;
@@ -1022,6 +1032,52 @@ export interface Address {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "retailers".
+ */
+export interface Retailer {
+  id: number;
+  shopName: string;
+  ownerName: string;
+  mobileNumber: string;
+  gstNumber: string;
+  shopAddress: {
+    street: string;
+    city: string;
+    state: string;
+    zipCode: string;
+    lat?: number | null;
+    lng?: number | null;
+  };
+  bankDetails: {
+    accountHolderName: string;
+    accountNumber: string;
+    ifscCode: string;
+    bankName: string;
+  };
+  approvalStatus: 'pending' | 'approved' | 'rejected' | 'suspended';
+  user: number | User;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "delivery-partners".
+ */
+export interface DeliveryPartner {
+  id: number;
+  fullName: string;
+  mobileNumber: string;
+  email: string;
+  drivingLicense: number | Media;
+  vehicleType: 'bike' | 'scooter' | 'bicycle' | 'car';
+  approvalStatus: 'pending' | 'approved' | 'rejected' | 'suspended';
+  onlineStatus: boolean;
+  user: number | User;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "form-submissions".
  */
 export interface FormSubmission {
@@ -1076,6 +1132,14 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'media';
         value: number | Media;
+      } | null)
+    | ({
+        relationTo: 'retailers';
+        value: number | Retailer;
+      } | null)
+    | ({
+        relationTo: 'delivery-partners';
+        value: number | DeliveryPartner;
       } | null)
     | ({
         relationTo: 'forms';
@@ -1169,6 +1233,9 @@ export interface UsersSelect<T extends boolean = true> {
   orders?: T;
   cart?: T;
   addresses?: T;
+  mobileNumber?: T;
+  mobileVerified?: T;
+  lastOtpLoginAt?: T;
   updatedAt?: T;
   createdAt?: T;
   email?: T;
@@ -1387,6 +1454,54 @@ export interface MediaSelect<T extends boolean = true> {
   height?: T;
   focalX?: T;
   focalY?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "retailers_select".
+ */
+export interface RetailersSelect<T extends boolean = true> {
+  shopName?: T;
+  ownerName?: T;
+  mobileNumber?: T;
+  gstNumber?: T;
+  shopAddress?:
+    | T
+    | {
+        street?: T;
+        city?: T;
+        state?: T;
+        zipCode?: T;
+        lat?: T;
+        lng?: T;
+      };
+  bankDetails?:
+    | T
+    | {
+        accountHolderName?: T;
+        accountNumber?: T;
+        ifscCode?: T;
+        bankName?: T;
+      };
+  approvalStatus?: T;
+  user?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "delivery-partners_select".
+ */
+export interface DeliveryPartnersSelect<T extends boolean = true> {
+  fullName?: T;
+  mobileNumber?: T;
+  email?: T;
+  drivingLicense?: T;
+  vehicleType?: T;
+  approvalStatus?: T;
+  onlineStatus?: T;
+  user?: T;
+  updatedAt?: T;
+  createdAt?: T;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
