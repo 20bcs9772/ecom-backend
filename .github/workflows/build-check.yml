@@ -34,6 +34,15 @@ jobs:
           echo "DATABASE_URL=${{ secrets.DATABASE_URL }}" >> .env
           echo "NEXT_PUBLIC_SERVER_URL=http://localhost:3000" >> .env
 
+      - name: Debug/Verify Database URL (masked)
+        run: |
+          if [ -z "${{ secrets.DATABASE_URL }}" ]; then
+            echo "Warning: DATABASE_URL secret is empty!"
+          else
+            echo "DATABASE_URL is set. Host/database name:"
+            echo "${{ secrets.DATABASE_URL }}" | sed 's/\/\/.*@/\/\/***@/'
+          fi
+
       - name: Run TypeScript checks
         run: pnpm exec tsc --noEmit
 
