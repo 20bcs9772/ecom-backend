@@ -228,6 +228,7 @@ export const seed = async ({
       collection: 'brands',
       data: {
         name: 'Apple',
+        slug: 'apple',
         description: 'Apple Inc. official brand.',
         featured: true,
       },
@@ -236,6 +237,7 @@ export const seed = async ({
       collection: 'brands',
       data: {
         name: 'Samsung',
+        slug: 'samsung',
         description: 'Samsung Electronics official brand.',
         featured: true,
       },
@@ -244,6 +246,7 @@ export const seed = async ({
       collection: 'brands',
       data: {
         name: 'Sony',
+        slug: 'sony',
         description: 'Sony Corporation official brand.',
         featured: true,
       },
