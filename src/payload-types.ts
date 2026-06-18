@@ -1070,9 +1070,13 @@ export interface Retailer {
   shopName: string;
   ownerName: string;
   mobileNumber: string;
+  emailId: string;
+  alternateContactNumber?: string | null;
   gstNumber: string;
+  images: (number | Media)[];
   shopAddress: {
     street: string;
+    landmark?: string | null;
     city: string;
     state: string;
     zipCode: string;
@@ -1084,6 +1088,13 @@ export interface Retailer {
     accountNumber: string;
     ifscCode: string;
     bankName: string;
+    upiId?: string | null;
+  };
+  businessHours: {
+    startTime: string;
+    endTime: string;
+    weekOff?: ('Monday' | 'Tuesday' | 'Wednesday' | 'Thursday' | 'Friday' | 'Saturday' | 'Sunday')[] | null;
+    openEveryday?: boolean | null;
   };
   approvalStatus: 'pending' | 'approved' | 'rejected' | 'suspended';
   user: number | User;
@@ -1499,11 +1510,15 @@ export interface RetailersSelect<T extends boolean = true> {
   shopName?: T;
   ownerName?: T;
   mobileNumber?: T;
+  emailId?: T;
+  alternateContactNumber?: T;
   gstNumber?: T;
+  images?: T;
   shopAddress?:
     | T
     | {
         street?: T;
+        landmark?: T;
         city?: T;
         state?: T;
         zipCode?: T;
@@ -1517,6 +1532,15 @@ export interface RetailersSelect<T extends boolean = true> {
         accountNumber?: T;
         ifscCode?: T;
         bankName?: T;
+        upiId?: T;
+      };
+  businessHours?:
+    | T
+    | {
+        startTime?: T;
+        endTime?: T;
+        weekOff?: T;
+        openEveryday?: T;
       };
   approvalStatus?: T;
   user?: T;

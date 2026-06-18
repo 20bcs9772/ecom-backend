@@ -26,6 +26,30 @@ export async function runRetailerTests(
     return
   }
 
+  // Find a media ID to use for shop images
+  const mediaDocs = await payload.find({
+    collection: 'media',
+    limit: 1,
+    overrideAccess: true,
+  })
+  let mediaId = mediaDocs.docs[0]?.id
+  if (!mediaId) {
+    const mockMedia = await payload.create({
+      collection: 'media',
+      data: {
+        alt: 'Mock License',
+      },
+      file: {
+        name: 'license.pdf',
+        data: Buffer.from('mock license data'),
+        mimetype: 'application/pdf',
+        size: 17,
+      },
+      overrideAccess: true,
+    })
+    mediaId = mockMedia.id
+  }
+
   // --- IMPOSSIBLE & SECURITY CASES ---
 
   // 1. Attempt to create profile without authentication (returns 401)
@@ -33,18 +57,29 @@ export async function runRetailerTests(
     shopName: 'Hackers Shop',
     ownerName: 'Hacker',
     mobileNumber: testMobile,
+    emailId: 'hacker@example.com',
+    alternateContactNumber: '+919999999998',
     gstNumber: 'GST1234567',
+    images: [mediaId],
     shopAddress: {
       street: '123 Fake St',
+      landmark: 'Near Hacker Hub',
       city: 'Delhi',
       state: 'Delhi',
       zipCode: '110001',
+    },
+    businessHours: {
+      startTime: '09:00 AM',
+      endTime: '09:00 PM',
+      weekOff: ['Sunday'],
+      openEveryday: false,
     },
     bankDetails: {
       accountHolderName: 'Hacker',
       accountNumber: '999999',
       ifscCode: 'IFSC999',
       bankName: 'HackerBank',
+      upiId: 'hacker@upi',
     },
   })
   report.assert(
@@ -64,18 +99,29 @@ export async function runRetailerTests(
       shopName: 'Madhav Gadgets',
       ownerName: 'Madhav Seller',
       mobileNumber: testMobile,
+      emailId: 'madhav.gadgets@testing.zinikart.local',
+      alternateContactNumber: '+919876543211',
       gstNumber: 'GST99ABCDE1234',
+      images: [mediaId],
       shopAddress: {
         street: '456 Tech Park Lane',
+        landmark: 'Phase 2 Tech Park',
         city: 'Bengaluru',
         state: 'Karnataka',
         zipCode: '560001',
+      },
+      businessHours: {
+        startTime: '10:00 AM',
+        endTime: '08:00 PM',
+        weekOff: ['Sunday'],
+        openEveryday: false,
       },
       bankDetails: {
         accountHolderName: 'Madhav Seller',
         accountNumber: '9876543210',
         ifscCode: 'IFSC0009876',
         bankName: 'Innovators Bank',
+        upiId: 'madhav@okaxis',
       },
       // Worst Case test: try to set approvalStatus during creation
       approvalStatus: 'approved',
@@ -169,18 +215,29 @@ export async function runRetailerTests(
       shopName: 'Duplicate Shop',
       ownerName: 'Another Owner',
       mobileNumber: testMobile,
+      emailId: 'duplicate.shop@testing.zinikart.local',
+      alternateContactNumber: '+919999999997',
       gstNumber: 'GST99ABCDE1234',
+      images: [mediaId],
       shopAddress: {
         street: '123 Fake St',
+        landmark: 'Near Duplicate Hub',
         city: 'Delhi',
         state: 'Delhi',
         zipCode: '110001',
+      },
+      businessHours: {
+        startTime: '09:00 AM',
+        endTime: '09:00 PM',
+        weekOff: ['Saturday', 'Sunday'],
+        openEveryday: false,
       },
       bankDetails: {
         accountHolderName: 'Another Owner',
         accountNumber: '999999',
         ifscCode: 'IFSC999',
         bankName: 'HackerBank',
+        upiId: 'dup@okicici',
       },
     },
     token

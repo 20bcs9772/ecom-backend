@@ -46,8 +46,25 @@ export const Retailers: CollectionConfig = {
       index: true,
     },
     {
+      name: 'emailId',
+      type: 'email',
+      required: true,
+    },
+    {
+      name: 'alternateContactNumber',
+      type: 'text',
+      required: false,
+    },
+    {
       name: 'gstNumber',
       type: 'text',
+      required: true,
+    },
+    {
+      name: 'images',
+      type: 'relationship',
+      relationTo: 'media',
+      hasMany: true,
       required: true,
     },
     {
@@ -59,6 +76,11 @@ export const Retailers: CollectionConfig = {
           name: 'street',
           type: 'text',
           required: true,
+        },
+        {
+          name: 'landmark',
+          type: 'text',
+          required: false,
         },
         {
           name: 'city',
@@ -109,6 +131,47 @@ export const Retailers: CollectionConfig = {
           name: 'bankName',
           type: 'text',
           required: true,
+        },
+        {
+          name: 'upiId',
+          type: 'text',
+          required: false,
+        },
+      ],
+    },
+    {
+      name: 'businessHours',
+      type: 'group',
+      required: true,
+      fields: [
+        {
+          name: 'startTime',
+          type: 'text',
+          required: true,
+        },
+        {
+          name: 'endTime',
+          type: 'text',
+          required: true,
+        },
+        {
+          name: 'weekOff',
+          type: 'select',
+          hasMany: true,
+          options: [
+            'Monday',
+            'Tuesday',
+            'Wednesday',
+            'Thursday',
+            'Friday',
+            'Saturday',
+            'Sunday',
+          ],
+        },
+        {
+          name: 'openEveryday',
+          type: 'checkbox',
+          defaultValue: false,
         },
       ],
     },
