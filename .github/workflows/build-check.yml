@@ -37,5 +37,9 @@ jobs:
       - name: Run TypeScript checks
         run: pnpm exec tsc --noEmit
 
+      - name: Run database migrations
+        run: pnpm run payload migrate
+
       - name: Run Next.js Build
         run: pnpm run build
+
