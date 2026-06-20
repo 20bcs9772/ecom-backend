@@ -25,11 +25,12 @@ async function main() {
   const testMobile = '+919999999999'
   const otherMobile = '+918888888888'
   const adminMobile = '+917777777777'
+  const retailerMobile = '+916666666666'
 
   // 2. Perform Database Cleanup first to ensure clean state
   console.log('\nCleaning up old test data from database...')
   
-  const cleanMobiles = [testMobile, otherMobile, adminMobile]
+  const cleanMobiles = [testMobile, otherMobile, adminMobile, retailerMobile]
   const existingUsers = await payload.find({
     collection: 'users',
     where: {
@@ -79,7 +80,7 @@ async function main() {
   await payload.delete({
     collection: 'products',
     where: {
-      title: { equals: 'ZiniPhone 14 Max' },
+      title: { in: ['ZiniPhone 14 Max', 'Retailer Standalone Phone', 'Cloned ZiniPhone 14 Max'] },
     },
     overrideAccess: true,
   })
@@ -128,6 +129,31 @@ async function main() {
     throw new Error('Failed to generate JWT token for second user')
   }
 
+  // Create a retailer user locally for catalog tests
+  console.log('\nCreating retailer test user for catalog tests...')
+  const retailerUser = await payload.create({
+    collection: 'users',
+    data: {
+      email: 'retailer.user@testing.zinikart.local',
+      mobileNumber: retailerMobile,
+      mobileVerified: true,
+      password: 'retailerPassword123',
+      roles: ['retailer'],
+    } as any,
+    overrideAccess: true,
+  })
+
+  // Log in as retailer via standard REST API to obtain a valid authenticated token
+  const retailerLoginRes = await apiRequest('/api/users/login', 'POST', {
+    email: 'retailer.user@testing.zinikart.local',
+    password: 'retailerPassword123',
+  })
+  const retailerUserToken = retailerLoginRes.body?.token
+
+  if (!retailerUserToken) {
+    throw new Error(`Failed to log in retailer user: ${JSON.stringify(retailerLoginRes.body)}`)
+  }
+
   // Create an admin user locally for catalog tests
   console.log('\nCreating admin test user for catalog tests...')
   const adminUser = await payload.create({
@@ -158,7 +184,7 @@ async function main() {
     await runAuthTests(report, testMobile)
     await runRetailerTests(report, payload, testMobile, otherUserToken)
     await runDeliveryTests(report, payload, testMobile, otherUserToken)
-    await runCatalogTests(report, payload, adminUserToken, otherUserToken)
+    await runCatalogTests(report, payload, adminUserToken, otherUserToken, retailerUserToken)
   } catch (err) {
     console.error('Test execution error occurred:', err)
   }
@@ -215,7 +241,7 @@ async function main() {
   await payload.delete({
     collection: 'products',
     where: {
-      title: { equals: 'ZiniPhone 14 Max' },
+      title: { in: ['ZiniPhone 14 Max', 'Retailer Standalone Phone', 'Cloned ZiniPhone 14 Max'] },
     },
     overrideAccess: true,
   })

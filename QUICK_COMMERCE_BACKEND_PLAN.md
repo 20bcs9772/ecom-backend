@@ -203,23 +203,39 @@ PRD requires master catalog products with multiple sellers and seller comparison
 
 | Collection | Ownership | Purpose |
 | --- | --- | --- |
-| `products` | Admin/catalog team | Master product data: name, brand, specs, warranty, images |
+| `products` | Retailers (CRUD for their own), Admin (everything) | Master product data: name, brand, specs, warranty, images, discounts |
 | `sellerProducts` | Retailer/admin | Seller-specific price, discount, stock, status, estimated delivery |
-| `categories` | Admin | Category/subcategory hierarchy |
-| `brands` | Admin | Brand filters and search |
+| `categories` | Retailer (Create/Read), Admin (everything) | Category/subcategory hierarchy and specification templates |
+| `brands` | Retailer (Create/Read), Admin (everything) | Brand filters and search |
 
 ### Product Fields
 
 | Field | Source | Notes |
 | --- | --- | --- |
-| Product name | Master product | Admin/catalog |
+| Product name | Master product | Admin/catalog / Retailer |
 | Images | Master product | Media uploads |
 | Description | Master product | AI autofill later |
-| Specifications | Master product | Gadgets/phones need structured specs |
+| Specifications | Master product | Dynamic validation against category specification templates |
 | Brand | Master product | Brand relation |
 | Warranty | Master product | Text/select |
 | Category/subcategory | Master product | Category relation |
+| discountPercent | Master product | Applied discount percentage (0-100), bidirectionally synced with discountedPrice |
+| discountedPrice | Master product | Calculated final price after discount |
+| retailer | Master product | Links the product to its creator/owner user |
 | Ratings/reviews | Aggregated | Later |
+
+### External Catalog Importer Service
+
+A modular integration service (`CatalogService`) using an **Adapter Pattern** is designed to import products into the master catalog.
+
+1.  **Supported Adapters**:
+    *   **MobileAPI.dev**: Provides live REST endpoint access to ~31,000+ smartphones, tablets, and laptops.
+    *   **GSMArena Scraper**: Community scraper API to fetch phone specifications and brand listings.
+    *   **DBpedia/Wikidata**: RDF query engine via SPARQL to get phone/camera specifications and Wikimedia image URLs.
+    *   **Kaggle Datasets**: Local CSV parser for digital cameras, headphones, and other static hardware specifications.
+2.  **Import Logic**:
+    *   **Just-in-Time Import**: When a retailer chooses to sell an item from the external list, the system automatically checks if it exists in the master catalog. If not, it imports it dynamically (saving title, brand, category, specifications, and downloading CC-licensed Wikimedia Commons images) before creating the seller's offer.
+    *   **Batch Synchronization**: Optional background cron job to cache popular models to minimize live API latency and stay within API rate limits.
 
 ### Seller Product Fields
 

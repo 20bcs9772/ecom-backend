@@ -2,11 +2,12 @@ import { slugField } from 'payload'
 import type { CollectionConfig } from 'payload'
 
 import { adminOnly } from '@/access/adminOnly'
+import { adminOrRetailer } from '@/access/adminOrRetailer'
 
 export const Brands: CollectionConfig = {
   slug: 'brands',
   access: {
-    create: adminOnly,
+    create: adminOrRetailer,
     delete: adminOnly,
     read: () => true,
     update: adminOnly,

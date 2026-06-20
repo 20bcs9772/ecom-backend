@@ -5,7 +5,8 @@ export async function runCatalogTests(
   report: ReportManager,
   payload: Payload,
   adminToken: string,
-  customerToken: string
+  customerToken: string,
+  retailerToken?: string
 ) {
   report.setSuite('Catalog Foundation')
   console.log('\nRunning Catalog Foundation tests...')
@@ -168,6 +169,81 @@ export async function runCatalogTests(
     `Expected status 201, got ${createProductRes.status}. Response: ${JSON.stringify(createProductRes.body)}`
   )
 
+  report.assert(
+    'Admin-created product defaults to isMasterTemplate: true and parentTemplate: null',
+    createProductRes.body?.doc?.isMasterTemplate === true && createProductRes.body?.doc?.parentTemplate === null,
+    'Best Case',
+    `Expected isMasterTemplate true and parentTemplate null, got isMasterTemplate ${createProductRes.body?.doc?.isMasterTemplate} and parentTemplate ${createProductRes.body?.doc?.parentTemplate}`
+  )
+
+  // 8b. Create Standalone Product as Retailer (where isMasterTemplate should be forced to false)
+  let clonedProductId: any = null
+  if (retailerToken) {
+    const retailerProductRes = await apiRequest(
+      '/api/products',
+      'POST',
+      {
+        title: 'Retailer Standalone Phone',
+        _status: 'published',
+        categories: [subcategoryId],
+        brand: brandId,
+        warranty: '1 Year Warranty',
+        isMasterTemplate: true, // Retailer tries to force this to true
+        specifications: [
+          { key: 'RAM', value: '12', type: 'number' }
+        ]
+      },
+      retailerToken
+    )
+    const retailerProductId = retailerProductRes.body?.doc?.id
+    const isRetailerProductCreated = retailerProductRes.status === 201 && !!retailerProductId
+
+    report.assert(
+      'Retailer creating product gets isMasterTemplate set to false (roles hook enforcement)',
+      isRetailerProductCreated && retailerProductRes.body?.doc?.isMasterTemplate === false,
+      'Best Case',
+      `Expected status 201 and isMasterTemplate false, got status ${retailerProductRes.status} and response body ${JSON.stringify(retailerProductRes.body)}`
+    )
+
+    // 8c. Create Cloned Product as Retailer (linked to parent master template)
+    const clonedProductRes = await apiRequest(
+      '/api/products',
+      'POST',
+      {
+        title: 'Cloned ZiniPhone 14 Max',
+        _status: 'published',
+        categories: [subcategoryId],
+        brand: brandId,
+        warranty: '2 Year Manufacturer Warranty',
+        parentTemplate: productId, // Links to master product
+        specifications: [
+          { key: 'RAM', value: '12', type: 'number' },
+          { key: 'Color', value: 'Black', type: 'select' },
+          { key: 'Release Date', value: '2026-05-30', type: 'date' }
+        ]
+      },
+      retailerToken
+    )
+    const clonedId = clonedProductRes.body?.doc?.id
+    const isClonedProductCreated = clonedProductRes.status === 201 && !!clonedId
+    if (isClonedProductCreated) {
+      clonedProductId = clonedId
+    }
+
+    const parentTemplateId = typeof clonedProductRes.body?.doc?.parentTemplate === 'object'
+      ? clonedProductRes.body?.doc?.parentTemplate?.id
+      : clonedProductRes.body?.doc?.parentTemplate
+
+    report.assert(
+      'Retailer cloning product gets parentTemplate linked and isMasterTemplate set to false',
+      isClonedProductCreated &&
+        parentTemplateId === productId &&
+        clonedProductRes.body?.doc?.isMasterTemplate === false,
+      'Best Case',
+      `Expected parentTemplate match and isMasterTemplate false, got status ${clonedProductRes.status} and response body ${JSON.stringify(clonedProductRes.body)}`
+    )
+  }
+
   if (!isProductCreated) return
 
   // --- BOUNDARY VALIDATION SCENARIOS (IMPOSSIBLE/WORST CASE) ---
@@ -292,8 +368,18 @@ export async function runCatalogTests(
     `Expected status 200 and parentCategory match. Subcategory parent: ${parentIdFromSubcat}, Parent: ${parentCategoryId}`
   )
 
-  // 11. Query Product detail publicly and verify brand and specs exist
-  const queryProductRes = await apiRequest(`/api/products/${productId}`, 'GET')
+  // 11. Verify master template is hidden from public query
+  const queryMasterRes = await apiRequest(`/api/products/${productId}`, 'GET')
+  report.assert(
+    'Public query of master template product returns 404 or 403 forbidden',
+    queryMasterRes.status === 403 || queryMasterRes.status === 404,
+    'Worst Case',
+    `Expected status 403 or 404, got ${queryMasterRes.status}`
+  )
+
+  // 11b. Query Product detail publicly and verify brand and specs exist
+  const targetProductId = clonedProductId || productId
+  const queryProductRes = await apiRequest(`/api/products/${targetProductId}`, 'GET')
   const productDoc = queryProductRes.body
   const brandIdFromProduct = typeof productDoc?.brand === 'object'
     ? productDoc?.brand?.id

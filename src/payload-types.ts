@@ -311,6 +311,14 @@ export interface Product {
   };
   priceInINREnabled?: boolean | null;
   priceInINR?: number | null;
+  /**
+   * Discount percentage to apply to this product.
+   */
+  discountPercent?: number | null;
+  /**
+   * Automatically calculated price after discount.
+   */
+  discountedPrice?: number | null;
   brand?: (number | null) | Brand;
   warranty?: string | null;
   specifications?:
@@ -331,6 +339,15 @@ export interface Product {
     description?: string | null;
   };
   categories?: (number | Category)[] | null;
+  retailer?: (number | null) | User;
+  /**
+   * Indicates if this product serves as a master catalog template.
+   */
+  isMasterTemplate?: boolean | null;
+  /**
+   * The master catalog template this product was cloned/listed from.
+   */
+  parentTemplate?: (number | null) | Product;
   /**
    * When enabled, the slug will auto-generate from the title field on save and autosave.
    */
@@ -1845,6 +1862,8 @@ export interface ProductsSelect<T extends boolean = true> {
   variants?: T;
   priceInINREnabled?: T;
   priceInINR?: T;
+  discountPercent?: T;
+  discountedPrice?: T;
   brand?: T;
   warranty?: T;
   specifications?:
@@ -1864,6 +1883,9 @@ export interface ProductsSelect<T extends boolean = true> {
         description?: T;
       };
   categories?: T;
+  retailer?: T;
+  isMasterTemplate?: T;
+  parentTemplate?: T;
   generateSlug?: T;
   slug?: T;
   updatedAt?: T;

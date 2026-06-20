@@ -20,6 +20,14 @@ import {
 } from '@payloadcms/richtext-lexical'
 import { DefaultDocumentIDType, Where } from 'payload'
 import { validateSpecifications } from './hooks/validateSpecifications'
+import { calculateDiscountedPrice } from './hooks/calculateDiscountedPrice'
+import { adminOnlyFieldAccess } from '@/access/adminOnlyFieldAccess'
+import { createAccess } from './access/create'
+import { readAccess } from './access/read'
+import { updateAccess } from './access/update'
+import { deleteAccess } from './access/delete'
+import { setRetailer } from './hooks/setRetailer'
+import { setTemplateFields } from './hooks/setTemplateFields'
 
 export const ProductsCollection: CollectionOverride = ({ defaultCollection }) => ({
   ...defaultCollection,
@@ -53,6 +61,12 @@ export const ProductsCollection: CollectionOverride = ({ defaultCollection }) =>
     priceInINR: true,
     inventory: true,
     meta: true,
+  },
+  access: {
+    create: createAccess,
+    read: readAccess,
+    update: updateAccess,
+    delete: deleteAccess,
   },
   fields: [
     { name: 'title', type: 'text', required: true },
@@ -144,6 +158,25 @@ export const ProductsCollection: CollectionOverride = ({ defaultCollection }) =>
         {
           fields: [
             ...defaultCollection.fields,
+            {
+              name: 'discountPercent',
+              type: 'number',
+              label: 'Discount Percent',
+              min: 0,
+              max: 100,
+              admin: {
+                placeholder: 'e.g. 10 for 10%',
+                description: 'Discount percentage to apply to this product.',
+              },
+            },
+            {
+              name: 'discountedPrice',
+              type: 'number',
+              label: 'Discounted Price',
+              admin: {
+                description: 'Automatically calculated price after discount.',
+              },
+            },
             {
               name: 'brand',
               type: 'relationship',
@@ -255,9 +288,52 @@ export const ProductsCollection: CollectionOverride = ({ defaultCollection }) =>
       hasMany: true,
       relationTo: 'categories',
     },
+    {
+      name: 'retailer',
+      type: 'relationship',
+      relationTo: 'users',
+      required: false,
+      admin: {
+        position: 'sidebar',
+      },
+    },
+    {
+      name: 'isMasterTemplate',
+      type: 'checkbox',
+      access: {
+        update: adminOnlyFieldAccess,
+      },
+      admin: {
+        position: 'sidebar',
+        description: 'Indicates if this product serves as a master catalog template.',
+      },
+    },
+    {
+      name: 'parentTemplate',
+      type: 'relationship',
+      relationTo: 'products',
+      required: false,
+      access: {
+        update: adminOnlyFieldAccess,
+      },
+      admin: {
+        position: 'sidebar',
+        description: 'The master catalog template this product was cloned/listed from.',
+      },
+    },
     slugField(),
   ],
   hooks: {
     ...defaultCollection?.hooks,
+    beforeChange: [
+      ...(defaultCollection?.hooks?.beforeChange || []),
+      setRetailer,
+      setTemplateFields,
+    ],
+    beforeValidate: [
+      ...(defaultCollection?.hooks?.beforeValidate || []),
+      calculateDiscountedPrice,
+    ],
   },
 })
+
