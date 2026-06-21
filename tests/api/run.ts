@@ -8,6 +8,8 @@ import { runAuthTests } from './auth'
 import { runRetailerTests } from './retailer'
 import { runDeliveryTests } from './delivery'
 import { runCatalogTests } from './catalog'
+import { runRatingsTests } from './ratings'
+
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -30,7 +32,7 @@ async function main() {
   // 2. Perform Database Cleanup first to ensure clean state
   console.log('\nCleaning up old test data from database...')
   
-  const cleanMobiles = [testMobile, otherMobile, adminMobile, retailerMobile]
+  const cleanMobiles = [testMobile, otherMobile, adminMobile, retailerMobile, '+915555555555']
   const existingUsers = await payload.find({
     collection: 'users',
     where: {
@@ -42,6 +44,13 @@ async function main() {
   const userIds = existingUsers.docs.map((u) => u.id)
   if (userIds.length > 0) {
     console.log(`Batch deleting profiles and users for IDs: ${userIds.join(', ')}`)
+    await payload.delete({
+      collection: 'ratings',
+      where: {
+        customer: { in: userIds },
+      },
+      overrideAccess: true,
+    })
     await payload.delete({
       collection: 'retailers',
       where: {
@@ -113,21 +122,18 @@ async function main() {
     overrideAccess: true,
   })
 
-  // Generate JWT token for the second user
-  const { token: otherUserToken } = await jwtSign({
-    fieldsToSign: {
-      collection: 'users',
-      email: otherUser.email,
-      id: otherUser.id,
-      roles: ['customer'],
-    },
-    secret: payload.secret,
-    tokenExpiration: 1209600,
+  // Log in as otherUser via standard REST API to obtain a valid authenticated token
+  const otherUserLoginRes = await apiRequest('/api/users/login', 'POST', {
+    email: 'other.user@testing.zinikart.local',
+    password: 'testPassword123',
   })
+  const otherUserToken = otherUserLoginRes.body?.token
 
   if (!otherUserToken) {
-    throw new Error('Failed to generate JWT token for second user')
+    throw new Error(`Failed to log in second user: ${JSON.stringify(otherUserLoginRes.body)}`)
   }
+
+
 
   // Create a retailer user locally for catalog tests
   console.log('\nCreating retailer test user for catalog tests...')
@@ -185,6 +191,8 @@ async function main() {
     await runRetailerTests(report, payload, testMobile, otherUserToken)
     await runDeliveryTests(report, payload, testMobile, otherUserToken)
     await runCatalogTests(report, payload, adminUserToken, otherUserToken, retailerUserToken)
+    await runRatingsTests(report, payload, otherUserToken, retailerUserToken)
+
   } catch (err) {
     console.error('Test execution error occurred:', err)
   }
@@ -204,7 +212,15 @@ async function main() {
   if (finalUserIds.length > 0) {
     console.log(`Batch cleaning profiles and users for IDs: ${finalUserIds.join(', ')}`)
     await payload.delete({
+      collection: 'ratings',
+      where: {
+        customer: { in: finalUserIds },
+      },
+      overrideAccess: true,
+    })
+    await payload.delete({
       collection: 'retailers',
+
       where: {
         user: { in: finalUserIds },
       },

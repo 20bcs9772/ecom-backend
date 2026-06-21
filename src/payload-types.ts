@@ -79,6 +79,7 @@ export interface Config {
     retailers: Retailer;
     'delivery-partners': DeliveryPartner;
     brands: Brand;
+    ratings: Rating;
     forms: Form;
     'form-submissions': FormSubmission;
     addresses: Address;
@@ -115,6 +116,7 @@ export interface Config {
     retailers: RetailersSelect<false> | RetailersSelect<true>;
     'delivery-partners': DeliveryPartnersSelect<false> | DeliveryPartnersSelect<true>;
     brands: BrandsSelect<false> | BrandsSelect<true>;
+    ratings: RatingsSelect<false> | RatingsSelect<true>;
     forms: FormsSelect<false> | FormsSelect<true>;
     'form-submissions': FormSubmissionsSelect<false> | FormSubmissionsSelect<true>;
     addresses: AddressesSelect<false> | AddressesSelect<true>;
@@ -330,6 +332,14 @@ export interface Product {
       }[]
     | null;
   relatedProducts?: (number | Product)[] | null;
+  /**
+   * Pre-calculated average rating cached from the reviews
+   */
+  averageRating?: number | null;
+  /**
+   * Total number of ratings submitted for this product
+   */
+  ratingCount?: number | null;
   meta?: {
     title?: string | null;
     /**
@@ -1132,6 +1142,14 @@ export interface Retailer {
   };
   approvalStatus: 'pending' | 'approved' | 'rejected' | 'suspended';
   user: number | User;
+  /**
+   * Pre-calculated average rating cached from the reviews
+   */
+  averageRating?: number | null;
+  /**
+   * Total number of ratings submitted for this retailer
+   */
+  ratingCount?: number | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -1149,6 +1167,26 @@ export interface DeliveryPartner {
   approvalStatus: 'pending' | 'approved' | 'rejected' | 'suspended';
   onlineStatus: boolean;
   user: number | User;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "ratings".
+ */
+export interface Rating {
+  id: number;
+  /**
+   * Rating score from 1 to 5
+   */
+  rating: number;
+  /**
+   * Optional review text
+   */
+  reviewText?: string | null;
+  product: number | Product;
+  retailer: number | Retailer;
+  customer: number | User;
   updatedAt: string;
   createdAt: string;
 }
@@ -1220,6 +1258,10 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'brands';
         value: number | Brand;
+      } | null)
+    | ({
+        relationTo: 'ratings';
+        value: number | Rating;
       } | null)
     | ({
         relationTo: 'forms';
@@ -1592,6 +1634,8 @@ export interface RetailersSelect<T extends boolean = true> {
       };
   approvalStatus?: T;
   user?: T;
+  averageRating?: T;
+  ratingCount?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -1622,6 +1666,19 @@ export interface BrandsSelect<T extends boolean = true> {
   featured?: T;
   generateSlug?: T;
   slug?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "ratings_select".
+ */
+export interface RatingsSelect<T extends boolean = true> {
+  rating?: T;
+  reviewText?: T;
+  product?: T;
+  retailer?: T;
+  customer?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -1875,6 +1932,8 @@ export interface ProductsSelect<T extends boolean = true> {
         id?: T;
       };
   relatedProducts?: T;
+  averageRating?: T;
+  ratingCount?: T;
   meta?:
     | T
     | {

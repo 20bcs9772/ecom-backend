@@ -246,6 +246,24 @@ export const ProductsCollection: CollectionOverride = ({ defaultCollection }) =>
               hasMany: true,
               relationTo: 'products',
             },
+            {
+              name: 'averageRating',
+              type: 'number',
+              defaultValue: 0,
+              admin: {
+                readOnly: true,
+                description: 'Pre-calculated average rating cached from the reviews',
+              },
+            },
+            {
+              name: 'ratingCount',
+              type: 'number',
+              defaultValue: 0,
+              admin: {
+                readOnly: true,
+                description: 'Total number of ratings submitted for this product',
+              },
+            },
           ],
           label: 'Product Details',
         },

@@ -397,4 +397,209 @@ export async function runCatalogTests(
     'Best Case',
     `Expected status 200 and populated fields, got: ${JSON.stringify(productDoc?.specifications)}`
   )
+
+  // 12. Custom Mobile Product Details API verification
+  // A. Dynamic query of master template details endpoint returns 404
+  const mobileMasterRes = await apiRequest(`/api/mobile/product/${productId}`, 'GET')
+  report.assert(
+    'GET /api/mobile/product/:id for master template returns 404 not found',
+    mobileMasterRes.status === 404,
+    'Worst Case',
+    `Expected status 404, got ${mobileMasterRes.status}`
+  )
+
+  // B. Dynamic query of cloned product details endpoint returns 200 with details and competitor offers
+  if (clonedProductId) {
+    // Resolve a valid media ID to use for the retailer profiles
+    const mediaDocs = await payload.find({
+      collection: 'media',
+      limit: 1,
+      overrideAccess: true,
+    })
+    let mediaId = mediaDocs.docs[0]?.id
+    if (!mediaId) {
+      const mockMedia = await payload.create({
+        collection: 'media',
+        data: {
+          alt: 'Mock License',
+        },
+        file: {
+          name: 'license.pdf',
+          data: Buffer.from('mock license data'),
+          mimetype: 'application/pdf',
+          size: 17,
+        },
+        overrideAccess: true,
+      })
+      mediaId = mockMedia.id
+    }
+
+    // Resolve the active retailer user
+    const retailerUsers = await payload.find({
+      collection: 'users',
+      where: {
+        email: { equals: 'retailer.user@testing.zinikart.local' },
+      },
+      overrideAccess: true,
+    })
+    const activeRetailerUserId = retailerUsers.docs[0]?.id
+
+    let activeRetailerProfile: any = null
+    if (activeRetailerUserId) {
+      activeRetailerProfile = await payload.create({
+        collection: 'retailers',
+        data: {
+          shopName: 'Active Retailer Gadgets',
+          ownerName: 'Active Seller',
+          mobileNumber: '+916666666666',
+          emailId: 'retailer.user@testing.zinikart.local',
+          gstNumber: 'GST99ABCDE6666',
+          images: [mediaId],
+          shopAddress: {
+            street: '123 Active St',
+            city: 'Delhi',
+            state: 'Delhi',
+            zipCode: '110001',
+          },
+          businessHours: {
+            startTime: '09:00',
+            endTime: '21:00',
+            openEveryday: true,
+          },
+          bankDetails: {
+            accountHolderName: 'Active Seller',
+            accountNumber: '444455556666',
+            ifscCode: 'IFSC0006666',
+            bankName: 'Delhi Bank',
+          },
+          approvalStatus: 'approved',
+          user: activeRetailerUserId,
+        },
+        overrideAccess: true,
+      })
+    }
+
+    // Create a competitor retailer user
+    const competitorUser = await payload.create({
+      collection: 'users',
+      data: {
+        email: 'competitor.retailer@testing.zinikart.local',
+        mobileNumber: '+915555555555',
+        mobileVerified: true,
+        password: 'compPassword123',
+        roles: ['retailer'],
+      } as any,
+      overrideAccess: true,
+    })
+
+    // Create a retailer profile for the competitor
+    const competitorProfile = await payload.create({
+      collection: 'retailers',
+      data: {
+        shopName: 'Competitor Gadgets',
+        ownerName: 'Competitor Seller',
+        mobileNumber: '+915555555555',
+        emailId: 'competitor.gadgets@testing.zinikart.local',
+        gstNumber: 'GST99ABCDE5555',
+        images: [mediaId],
+        shopAddress: {
+          street: '789 Comp Lane',
+          city: 'Mumbai',
+          state: 'Maharashtra',
+          zipCode: '400001',
+        },
+        businessHours: {
+          startTime: '09:00',
+          endTime: '21:00',
+          openEveryday: true,
+        },
+        bankDetails: {
+          accountHolderName: 'Competitor Seller',
+          accountNumber: '111122223333',
+          ifscCode: 'IFSC0005555',
+          bankName: 'Mumbai Bank',
+        },
+        approvalStatus: 'approved',
+        user: competitorUser.id,
+      },
+      overrideAccess: true,
+    })
+
+    // Create a competitor cloned product
+    const competitorProduct = await payload.create({
+      collection: 'products',
+      data: {
+        title: 'Competitor Cloned Phone',
+        slug: 'competitor-cloned-phone',
+        _status: 'published',
+        categories: [subcategoryId],
+        brand: brandId,
+        priceInINREnabled: true,
+        priceInINR: 75000,
+        warranty: '1 Year Warranty',
+        isMasterTemplate: false,
+        parentTemplate: productId,
+        retailer: competitorUser.id,
+        specifications: [
+          { key: 'RAM', value: '12', type: 'number' },
+        ],
+      },
+      overrideAccess: true,
+    })
+
+    // Fetch the cloned product details via the custom endpoint
+    const mobileClonedRes = await apiRequest(`/api/mobile/product/${clonedProductId}`, 'GET')
+    const hasCompetitorOffer = Array.isArray(mobileClonedRes.body?.otherOffers) &&
+      mobileClonedRes.body?.otherOffers.some((offer: any) =>
+        offer.productId === competitorProduct.id &&
+        offer.price === 75000 &&
+        offer.shopName === 'Competitor Gadgets' &&
+        offer.city === 'Mumbai' &&
+        typeof offer.averageRating === 'number' &&
+        typeof offer.ratingCount === 'number'
+      )
+
+    report.assert(
+      'GET /api/mobile/product/:id for cloned product returns 200, product details with ratings, active retailer profile with ratings, and competitor otherOffers with ratings',
+      mobileClonedRes.status === 200 &&
+        mobileClonedRes.body?.product?.id === clonedProductId &&
+        typeof mobileClonedRes.body?.product?.averageRating === 'number' &&
+        typeof mobileClonedRes.body?.product?.ratingCount === 'number' &&
+        mobileClonedRes.body?.retailer?.shopName === 'Active Retailer Gadgets' &&
+        typeof mobileClonedRes.body?.retailer?.averageRating === 'number' &&
+        typeof mobileClonedRes.body?.retailer?.ratingCount === 'number' &&
+        hasCompetitorOffer,
+      'Best Case',
+      `Expected status 200, correct product ID, ratings, and competitor offer. Got status: ${mobileClonedRes.status}, Body: ${JSON.stringify(mobileClonedRes.body)}`
+    )
+
+    // Cleanup competitor and active retailer test records
+    await payload.delete({
+      collection: 'products',
+      where: {
+        id: { equals: competitorProduct.id },
+      },
+      overrideAccess: true,
+    })
+    const profilesToCleanup = [competitorProfile.id]
+    if (activeRetailerProfile) {
+      profilesToCleanup.push(activeRetailerProfile.id)
+    }
+    await payload.delete({
+      collection: 'retailers',
+      where: {
+        id: { in: profilesToCleanup },
+      },
+      overrideAccess: true,
+    })
+    await payload.delete({
+      collection: 'users',
+      where: {
+        id: { equals: competitorUser.id },
+      },
+      overrideAccess: true,
+    })
+  } else {
+    report.assert('Custom endpoint test skipped: clonedProductId not defined', false, 'Best Case')
+  }
 }

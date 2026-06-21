@@ -1,4 +1,6 @@
 import type { CollectionSlug, GlobalSlug, Payload, PayloadRequest, File } from 'payload'
+import fs from 'fs'
+import path from 'path'
 
 import { contactFormData } from './contact-form'
 import { contactPageData } from './contact-page'
@@ -136,12 +138,6 @@ export const seed = async ({
     imageTshirtBlack,
     imageTshirtWhite,
     imageHero,
-    mobileCategory,
-    cameraCategory,
-    headphonesCategory,
-    appleBrand,
-    samsungBrand,
-    sonyBrand,
   ] = await Promise.all([
     payload.create({
       collection: 'users',
@@ -158,7 +154,7 @@ export const seed = async ({
         name: 'Retailer User',
         email: 'retailer@example.com',
         password: 'password',
-        roles: ['customer'],
+        roles: ['retailer'],
       },
     }),
     payload.create({
@@ -190,6 +186,73 @@ export const seed = async ({
       data: imageHero1Data,
       file: heroBuffer,
     }),
+  ])
+
+  // Load mobile phone dataset
+  let dataset: any[] = []
+  try {
+    const datasetPath = path.resolve(process.cwd(), 'datasets/phones_data_20250729_022344.json')
+    if (fs.existsSync(datasetPath)) {
+      payload.logger.info(`— Reading dataset from ${datasetPath}...`)
+      dataset = JSON.parse(fs.readFileSync(datasetPath, 'utf8'))
+    } else {
+      payload.logger.warn(`Dataset file not found at ${datasetPath}`)
+    }
+  } catch (err) {
+    payload.logger.error(`Failed to read dataset: ${err instanceof Error ? err.message : String(err)}`)
+  }
+
+  // Pick 4 products for each of the 6 brands: Apple, Samsung, Oppo, Vivo, Realme, Motorola
+  const targetBrands = ['apple', 'samsung', 'oppo', 'vivo', 'realme', 'motorola']
+  const selectedProductsByBrand: Record<string, any[]> = {
+    apple: [],
+    samsung: [],
+    oppo: [],
+    vivo: [],
+    realme: [],
+    motorola: [],
+  }
+
+  for (const item of dataset) {
+    const brandName = item.brand?.trim().toLowerCase()
+    if (brandName && targetBrands.includes(brandName)) {
+      const ramNum = parseInt(item.ram || '')
+      const storage = (item.internal_storage || '').trim().replace(/\s+/g, '')
+      if (!isNaN(ramNum) && storage && selectedProductsByBrand[brandName].length < 4) {
+        selectedProductsByBrand[brandName].push(item)
+      }
+    }
+  }
+
+  // Collect unique storage values to set up Mobile category template options
+  const uniqueStorageOptions = new Set<string>()
+  for (const brandName of targetBrands) {
+    for (const item of selectedProductsByBrand[brandName]) {
+      const storage = (item.internal_storage || '').trim().replace(/\s+/g, '')
+      if (storage) {
+        uniqueStorageOptions.add(storage)
+      }
+    }
+  }
+  if (uniqueStorageOptions.size === 0) {
+    uniqueStorageOptions.add('128GB')
+    uniqueStorageOptions.add('256GB')
+    uniqueStorageOptions.add('512GB')
+  }
+
+  // Create categories and brands
+  const [
+    mobileCategory,
+    cameraCategory,
+    headphonesCategory,
+    appleBrand,
+    samsungBrand,
+    sonyBrand,
+    oppoBrand,
+    vivoBrand,
+    realmeBrand,
+    motorolaBrand,
+  ] = await Promise.all([
     payload.create({
       collection: 'categories',
       data: {
@@ -197,7 +260,12 @@ export const seed = async ({
         slug: 'mobile',
         specificationTemplates: [
           { name: 'RAM', type: 'number', required: true },
-          { name: 'Storage', type: 'select', options: [{ option: '128GB' }, { option: '256GB' }], required: true },
+          {
+            name: 'Storage',
+            type: 'select',
+            options: Array.from(uniqueStorageOptions).map((opt) => ({ option: opt })),
+            required: true,
+          },
           { name: 'Release Date', type: 'date', required: false },
         ],
       },
@@ -248,6 +316,42 @@ export const seed = async ({
         name: 'Sony',
         slug: 'sony',
         description: 'Sony Corporation official brand.',
+        featured: true,
+      },
+    }),
+    payload.create({
+      collection: 'brands',
+      data: {
+        name: 'Oppo',
+        slug: 'oppo',
+        description: 'Oppo official brand.',
+        featured: true,
+      },
+    }),
+    payload.create({
+      collection: 'brands',
+      data: {
+        name: 'Vivo',
+        slug: 'vivo',
+        description: 'Vivo official brand.',
+        featured: true,
+      },
+    }),
+    payload.create({
+      collection: 'brands',
+      data: {
+        name: 'Realme',
+        slug: 'realme',
+        description: 'Realme official brand.',
+        featured: true,
+      },
+    }),
+    payload.create({
+      collection: 'brands',
+      data: {
+        name: 'Motorola',
+        slug: 'motorola',
+        description: 'Motorola official brand.',
         featured: true,
       },
     }),
@@ -329,26 +433,115 @@ export const seed = async ({
         relatedProducts: [],
       }),
       brand: sonyBrand.id,
+      isMasterTemplate: true,
+      parentTemplate: null,
+      description: createLexicalDescription('Premium noise-cancelling wireless headphones with custom color options.'),
     },
   })
 
-  const productSmartphone = await payload.create({
-    collection: 'products',
-    depth: 0,
-    data: {
-      ...productSmartphoneData({
-        galleryImages: [
-          { image: imageTshirtBlack, variantOption: optBlack },
-          { image: imageTshirtWhite, variantOption: optWhite },
-        ],
-        metaImage: imageTshirtBlack,
-        variantTypes: [colorType, storageType],
-        categories: [mobileCategory],
-        relatedProducts: [productHeadphones],
-      }),
-      brand: appleBrand.id,
-    },
-  })
+  const brandToDoc = {
+    apple: appleBrand,
+    samsung: samsungBrand,
+    oppo: oppoBrand,
+    vivo: vivoBrand,
+    realme: realmeBrand,
+    motorola: motorolaBrand,
+  }
+
+  payload.logger.info(`— Seeding master template products from dataset...`)
+  const masterProducts: any[] = []
+  let productSmartphone: any = null
+
+  for (const brandName of targetBrands) {
+    const brandDoc = brandToDoc[brandName as keyof typeof brandToDoc]
+    const items = selectedProductsByBrand[brandName]
+    
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i]
+      const ramNum = parseInt(item.ram || '')
+      const storage = (item.internal_storage || '').trim().replace(/\s+/g, '')
+      const isFirstSmartphone = !productSmartphone && brandName === 'apple'
+      
+      const slug = `${item.brand}-${item.model}`.toLowerCase().replace(/[^a-z0-9]+/g, '-')
+      
+      let price = 25000
+      if (brandName === 'apple') {
+        price = 79900 + (ramNum * 3000)
+      } else if (brandName === 'samsung') {
+        price = 29900 + (ramNum * 2000)
+      } else {
+        price = 14900 + (ramNum * 1500)
+      }
+
+      const releaseDate = parseReleaseDate(item.release_date)
+      const specs: { key: string; value: string; type: 'text' | 'number' | 'select' | 'date' }[] = [
+        { key: 'RAM', value: String(ramNum), type: 'number' },
+        { key: 'Storage', value: storage, type: 'select' },
+      ]
+      if (releaseDate) {
+        specs.push({ key: 'Release Date', value: releaseDate, type: 'date' })
+      }
+
+      const mainImageId = await fetchImageWithFallback(payload, item.image_url, imageTshirtBlack.id)
+
+      const categories = [mobileCategory.id]
+      let description: any = null
+
+      if (categories.includes(mobileCategory.id)) {
+        const ramStr = item.ram ? `with ${item.ram} RAM` : ''
+        const storageStr = item.internal_storage ? `and ${item.internal_storage} internal storage` : ''
+        const chipsetStr = item.chipset ? `, powered by the ${item.chipset} processor` : ''
+        const batteryStr = item.battery_capacity ? `. Equipped with a ${item.battery_capacity} battery` : ''
+        const autoDesc = `${item.model} is a high-performance ${item.device_type || 'smartphone'} ${ramStr} ${storageStr}${chipsetStr}${batteryStr}.`
+        description = createLexicalDescription(autoDesc)
+      } else {
+        description = createLexicalDescription('Standard mobile device.')
+      }
+
+      const productData: any = {
+        title: item.model,
+        slug,
+        _status: 'published',
+        brand: brandDoc.id,
+        categories,
+        priceInINREnabled: true,
+        priceInINR: price,
+        isMasterTemplate: true,
+        parentTemplate: null,
+        description,
+        specifications: specs,
+        gallery: [{ image: mainImageId }],
+        meta: {
+          title: `${item.model} | ZiniKart`,
+          description: `The ultimate ${item.model} experience.`,
+          image: mainImageId,
+        },
+      }
+
+      if (isFirstSmartphone) {
+        productData.enableVariants = true
+        productData.variantTypes = [colorType.id, storageType.id]
+        productData.gallery = [
+          { image: imageTshirtBlack.id, variantOption: optBlack.id },
+          { image: imageTshirtWhite.id, variantOption: optWhite.id },
+        ]
+      } else {
+        productData.enableVariants = false
+      }
+
+      const createdProduct = await payload.create({
+        collection: 'products',
+        depth: 0,
+        data: productData,
+      })
+
+      masterProducts.push(createdProduct)
+      
+      if (isFirstSmartphone) {
+        productSmartphone = createdProduct
+      }
+    }
+  }
 
   const productCamera = await payload.create({
     collection: 'products',
@@ -361,6 +554,9 @@ export const seed = async ({
         relatedProducts: [],
       }),
       brand: sonyBrand.id,
+      isMasterTemplate: true,
+      parentTemplate: null,
+      description: createLexicalDescription('Professional Mirrorless Camera.'),
     },
   })
 
@@ -517,6 +713,58 @@ export const seed = async ({
       user: retailerUser.id,
     },
   })
+
+  // Seed retailer cloned products
+  payload.logger.info(`— Seeding retailer cloned products...`)
+  const clonedCount = 3
+  const templatesToClone = masterProducts.filter(p => p.id !== productSmartphone.id).slice(0, clonedCount)
+  for (let i = 0; i < templatesToClone.length; i++) {
+    const template = templatesToClone[i]
+    const brandId = typeof template.brand === 'object' ? template.brand.id : template.brand
+    const categoryIds = Array.isArray(template.categories)
+      ? template.categories.map((c: any) => typeof c === 'object' ? c.id : c)
+      : []
+
+    const cleanSpecs = Array.isArray(template.specifications)
+      ? template.specifications.map((s: any) => ({ key: s.key, value: s.value, type: s.type }))
+      : []
+
+    const cleanGallery = Array.isArray(template.gallery)
+      ? template.gallery.map((g: any) => ({
+          image: typeof g.image === 'object' ? g.image.id : g.image,
+          variantOption: typeof g.variantOption === 'object' ? g.variantOption?.id : g.variantOption,
+        }))
+      : []
+
+    const metaImageId = typeof template.meta?.image === 'object'
+      ? template.meta.image.id
+      : template.meta?.image || imageTshirtBlack.id
+
+    await payload.create({
+      collection: 'products',
+      data: {
+        title: `${template.title} (ZiniTech Shop)`,
+        slug: `${template.slug}-cloned-${i}`,
+        _status: 'published',
+        enableVariants: false,
+        categories: categoryIds,
+        brand: brandId,
+        priceInINREnabled: true,
+        priceInINR: Math.round(template.priceInINR * 0.95), // 5% discount
+        warranty: '1 Year Retailer Warranty',
+        isMasterTemplate: false,
+        parentTemplate: template.id,
+        retailer: retailerUser.id,
+        specifications: cleanSpecs,
+        gallery: cleanGallery,
+        meta: {
+          title: `${template.title} | ZiniTech Shop`,
+          description: `Buy ${template.title} at custom prices from ZiniTech Shop.`,
+          image: metaImageId,
+        },
+      },
+    })
+  }
 
   const deliveryProfile = await payload.create({
     collection: 'delivery-partners',
@@ -835,5 +1083,77 @@ async function fetchFileByURL(url: string): Promise<File> {
     data: Buffer.from(data),
     mimetype: `image/${url.split('.').pop()}`,
     size: data.byteLength,
+  }
+}
+
+async function fetchImageWithFallback(
+  payload: Payload,
+  url: string | null | undefined,
+  fallbackImageId: string | number
+): Promise<string | number> {
+  if (!url) return fallbackImageId
+  try {
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 1500)
+    const res = await fetch(url, { signal: controller.signal })
+    clearTimeout(timeoutId)
+    if (!res.ok) throw new Error(`Status ${res.status}`)
+    const arrayBuffer = await res.arrayBuffer()
+    const filename = url.split('/').pop() || `phone-${Date.now()}.webp`
+    const file: File = {
+      name: filename,
+      data: Buffer.from(arrayBuffer),
+      mimetype: `image/${filename.split('.').pop() || 'webp'}`,
+      size: arrayBuffer.byteLength,
+    }
+    const mediaDoc = await payload.create({
+      collection: 'media',
+      data: {
+        alt: filename,
+      },
+      file,
+    })
+    return mediaDoc.id
+  } catch (err) {
+    payload.logger.warn(`Failed to fetch image ${url}, falling back.`)
+    return fallbackImageId
+  }
+}
+
+function parseReleaseDate(dateStr: string | null | undefined): string | undefined {
+  if (!dateStr) return undefined
+  const cleaned = dateStr.replace(/Exp\.|Rumored|Upcoming|Announced/gi, '').trim()
+  const parsed = Date.parse(cleaned)
+  if (isNaN(parsed)) return undefined
+  return new Date(parsed).toISOString().split('T')[0]
+}
+
+function createLexicalDescription(text: string): any {
+  return {
+    root: {
+      type: 'root',
+      format: '',
+      indent: 0,
+      version: 1,
+      children: [
+        {
+          type: 'paragraph',
+          format: '',
+          indent: 0,
+          version: 1,
+          children: [
+            {
+              detail: 0,
+              format: 0,
+              mode: 'normal',
+              style: '',
+              text,
+              type: 'text',
+              version: 1,
+            },
+          ],
+        },
+      ],
+    },
   }
 }

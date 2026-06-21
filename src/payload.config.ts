@@ -23,7 +23,9 @@ import { DeliveryPartners } from '@/collections/DeliveryPartners'
 import { Brands } from '@/collections/Brands'
 import { Footer } from '@/globals/Footer'
 import { Header } from '@/globals/Header'
+import { Ratings } from '@/collections/Ratings'
 import { plugins } from './plugins'
+import { productDetailsEndpoint } from '@/endpoints/mobile/catalog/productDetails'
 
 const filename = fileURLToPath(import.meta.url)
 const dirname = path.dirname(filename)
@@ -40,7 +42,7 @@ export default buildConfig({
     },
     user: Users.slug,
   },
-  collections: [Users, Pages, Categories, Media, Retailers, DeliveryPartners, Brands],
+  collections: [Users, Pages, Categories, Media, Retailers, DeliveryPartners, Brands, Ratings],
   db: postgresAdapter({
     pool: {
       connectionString: process.env.DATABASE_URL || '',
@@ -83,7 +85,13 @@ export default buildConfig({
     },
   }),
   //email: nodemailerAdapter(),
-  endpoints: [],
+  endpoints: [
+    {
+      method: 'get',
+      path: '/mobile/product/:id',
+      handler: productDetailsEndpoint,
+    },
+  ],
   globals: [Header, Footer],
   plugins,
   secret: process.env.PAYLOAD_SECRET || '',
