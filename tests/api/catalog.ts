@@ -148,6 +148,8 @@ export async function runCatalogTests(
     {
       title: 'ZiniPhone 14 Max',
       _status: 'published',
+      priceInINR: 99900,
+      inventory: 100,
       categories: [subcategoryId],
       brand: brandId,
       warranty: '2 Year Manufacturer Warranty',
@@ -185,6 +187,8 @@ export async function runCatalogTests(
       {
         title: 'Retailer Standalone Phone',
         _status: 'published',
+        priceInINR: 89900,
+        inventory: 100,
         categories: [subcategoryId],
         brand: brandId,
         warranty: '1 Year Warranty',
@@ -212,6 +216,8 @@ export async function runCatalogTests(
       {
         title: 'Cloned ZiniPhone 14 Max',
         _status: 'published',
+        priceInINR: 89900,
+        inventory: 100,
         categories: [subcategoryId],
         brand: brandId,
         warranty: '2 Year Manufacturer Warranty',
@@ -571,6 +577,82 @@ export async function runCatalogTests(
         hasCompetitorOffer,
       'Best Case',
       `Expected status 200, correct product ID, ratings, and competitor offer. Got status: ${mobileClonedRes.status}, Body: ${JSON.stringify(mobileClonedRes.body)}`
+    )
+
+    // 13. Custom Mobile Search Endpoint (/api/mobile/search) verification
+    
+    // A. Search by product name (q=Cloned)
+    const searchProdRes = await apiRequest('/api/mobile/search?q=Cloned', 'GET')
+    const hasClonedProduct = Array.isArray(searchProdRes.body?.products) &&
+      searchProdRes.body?.products.some((p: any) => p.id === clonedProductId)
+
+    report.assert(
+      'GET /api/mobile/search?q=Cloned returns 200 and matches the cloned product listing',
+      searchProdRes.status === 200 && hasClonedProduct,
+      'Best Case',
+      `Expected status 200 and products array containing cloned product. Got status: ${searchProdRes.status}, Body: ${JSON.stringify(searchProdRes.body)}`
+    )
+
+    // B. Search by brand name (q=ZiniTech)
+    const searchBrandRes = await apiRequest('/api/mobile/search?q=ZiniTech', 'GET')
+    const hasProductFromBrand = Array.isArray(searchBrandRes.body?.products) &&
+      searchBrandRes.body?.products.some((p: any) => p.id === clonedProductId)
+
+    report.assert(
+      'GET /api/mobile/search?q=ZiniTech (brand search) returns 200 and matches products of that brand',
+      searchBrandRes.status === 200 && hasProductFromBrand,
+      'Best Case',
+      `Expected status 200 and products belonging to brand. Got status: ${searchBrandRes.status}, Body: ${JSON.stringify(searchBrandRes.body)}`
+    )
+
+    // C. Search by category title (q=Smartphones)
+    const searchCategoryRes = await apiRequest('/api/mobile/search?q=Smartphones', 'GET')
+    const hasProductFromCategory = Array.isArray(searchCategoryRes.body?.products) &&
+      searchCategoryRes.body?.products.some((p: any) => p.id === clonedProductId)
+
+    report.assert(
+      'GET /api/mobile/search?q=Smartphones (category search) returns 200 and matches products in that category',
+      searchCategoryRes.status === 200 && hasProductFromCategory,
+      'Best Case',
+      `Expected status 200 and products belonging to category. Got status: ${searchCategoryRes.status}, Body: ${JSON.stringify(searchCategoryRes.body)}`
+    )
+
+    // D. Search by retailer shopName (q=Active Retailer)
+    const searchRetailerRes = await apiRequest('/api/mobile/search?q=Active Retailer', 'GET')
+    const hasRetailerProduct = Array.isArray(searchRetailerRes.body?.products) &&
+      searchRetailerRes.body?.products.some((p: any) => p.id === clonedProductId)
+    const hasRetailerProfile = Array.isArray(searchRetailerRes.body?.retailers) &&
+      searchRetailerRes.body?.retailers.some((r: any) => r.shopName === 'Active Retailer Gadgets')
+
+    report.assert(
+      'GET /api/mobile/search?q=Active Retailer (retailer search) returns 200, matching products, and matching retailer profiles',
+      searchRetailerRes.status === 200 && hasRetailerProduct && hasRetailerProfile,
+      'Best Case',
+      `Expected status 200, products, and retailer profile. Got status: ${searchRetailerRes.status}, Body: ${JSON.stringify(searchRetailerRes.body)}`
+    )
+
+    // E. Search with empty query q= returns empty results
+    const searchEmptyRes = await apiRequest('/api/mobile/search?q=', 'GET')
+    const isEmptyResults = Array.isArray(searchEmptyRes.body?.products) && searchEmptyRes.body?.products.length === 0 &&
+                           Array.isArray(searchEmptyRes.body?.retailers) && searchEmptyRes.body?.retailers.length === 0
+
+    report.assert(
+      'GET /api/mobile/search?q= (empty query) returns 200 and empty lists',
+      searchEmptyRes.status === 200 && isEmptyResults,
+      'Best Case',
+      `Expected empty lists, got status: ${searchEmptyRes.status}, Body: ${JSON.stringify(searchEmptyRes.body)}`
+    )
+
+    // F. Search with non-existent query q=NonExistentQueryXYZ returns empty results
+    const searchNoMatchRes = await apiRequest('/api/mobile/search?q=NonExistentQueryXYZ', 'GET')
+    const isNoMatchResults = Array.isArray(searchNoMatchRes.body?.products) && searchNoMatchRes.body?.products.length === 0 &&
+                           Array.isArray(searchNoMatchRes.body?.retailers) && searchNoMatchRes.body?.retailers.length === 0
+
+    report.assert(
+      'GET /api/mobile/search?q=NonExistentQueryXYZ (no matches) returns 200 and empty lists',
+      searchNoMatchRes.status === 200 && isNoMatchResults,
+      'Best Case',
+      `Expected empty lists, got status: ${searchNoMatchRes.status}, Body: ${JSON.stringify(searchNoMatchRes.body)}`
     )
 
     // Cleanup competitor and active retailer test records

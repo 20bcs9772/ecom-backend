@@ -27,6 +27,7 @@ import { Ratings } from '@/collections/Ratings'
 import { Wishlists } from '@/collections/Wishlists'
 import { plugins } from './plugins'
 import { productDetailsEndpoint } from '@/endpoints/mobile/catalog/productDetails'
+import { searchEndpoint } from '@/endpoints/mobile/search/index'
 
 const filename = fileURLToPath(import.meta.url)
 const dirname = path.dirname(filename)
@@ -91,6 +92,11 @@ export default buildConfig({
       method: 'get',
       path: '/mobile/product/:id',
       handler: productDetailsEndpoint,
+    },
+    {
+      method: 'get',
+      path: '/mobile/search',
+      handler: searchEndpoint,
     },
   ],
   globals: [Header, Footer],

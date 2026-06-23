@@ -10,6 +10,8 @@ import { runDeliveryTests } from './delivery'
 import { runCatalogTests } from './catalog'
 import { runRatingsTests } from './ratings'
 import { runWishlistTests } from './wishlist'
+import { runCartTests } from './cart'
+import { runCheckoutTests } from './checkout'
 
 
 const __filename = fileURLToPath(import.meta.url)
@@ -54,6 +56,34 @@ async function main() {
     })
     await payload.delete({
       collection: 'wishlists',
+      where: {
+        customer: { in: userIds },
+      },
+      overrideAccess: true,
+    })
+    await payload.delete({
+      collection: 'carts',
+      where: {
+        customer: { in: userIds },
+      },
+      overrideAccess: true,
+    })
+    await payload.delete({
+      collection: 'orders',
+      where: {
+        customer: { in: userIds },
+      },
+      overrideAccess: true,
+    })
+    await payload.delete({
+      collection: 'transactions',
+      where: {
+        customer: { in: userIds },
+      },
+      overrideAccess: true,
+    })
+    await payload.delete({
+      collection: 'addresses',
       where: {
         customer: { in: userIds },
       },
@@ -201,6 +231,8 @@ async function main() {
     await runCatalogTests(report, payload, adminUserToken, otherUserToken, retailerUserToken)
     await runRatingsTests(report, payload, otherUserToken, retailerUserToken)
     await runWishlistTests(report, payload, otherUserToken, retailerUserToken)
+    await runCartTests(report, payload, otherUserToken)
+    await runCheckoutTests(report, payload, otherUserToken)
 
   } catch (err) {
     console.error('Test execution error occurred:', err)
@@ -229,6 +261,34 @@ async function main() {
     })
     await payload.delete({
       collection: 'wishlists',
+      where: {
+        customer: { in: finalUserIds },
+      },
+      overrideAccess: true,
+    })
+    await payload.delete({
+      collection: 'carts',
+      where: {
+        customer: { in: finalUserIds },
+      },
+      overrideAccess: true,
+    })
+    await payload.delete({
+      collection: 'orders',
+      where: {
+        customer: { in: finalUserIds },
+      },
+      overrideAccess: true,
+    })
+    await payload.delete({
+      collection: 'transactions',
+      where: {
+        customer: { in: finalUserIds },
+      },
+      overrideAccess: true,
+    })
+    await payload.delete({
+      collection: 'addresses',
       where: {
         customer: { in: finalUserIds },
       },
